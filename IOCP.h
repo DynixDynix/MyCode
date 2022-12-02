@@ -1,7 +1,7 @@
 /*
 当前版本调用标准:
 --------------------------------------------------------------------------------------------------------------------------------
-|---| 完成后可读次数 | 完成后可写次数 | 写后立即ColoseSocket | ConnectEx后立即读写 | 服务端连接IO数量 | 多次投递IO参数互不影响 |
+|---| 完成后可读IOCP_Num | 完成后可写IOCP_Num | 写后立即ColoseSocket | ConnectEx后立即读写 | 服务端连接IO数量 | 多次投递IO参数互不影响 |
 --------------------------------------------------------------------------------------------------------------------------------
 |TCP|      无限      |      无限      |          √          |          ×         |       65535      |           √           |
 --------------------------------------------------------------------------------------------------------------------------------
@@ -9,8 +9,6 @@
 --------------------------------------------------------------------------------------------------------------------------------
 |SSL|      一次      |      无限      |          ×          |          ×         |       65535      |           √           |
 --------------------------------------------------------------------------------------------------------------------------------
-QQ:3011688168
-Emall:dywh@dynix.online
 */
 #pragma once
 #include "stdafx.h"
@@ -84,7 +82,7 @@ struct Struct_IOCP_Return
 DWORD Complete_Index;
 HANDLE IOCP_Handle;
 WSADATA IOCP_WSAData;
-hostent*主机信息结构;
+hostent*IOCP_Hostent;
 GUID DisconnectEx_GUID;
 GUID ConnectEx_GUID;
 GUID AcceptEx_GUID;
@@ -103,7 +101,7 @@ struct CRYPTO_dynlock_value
 Struct_HashLinked_0x4 Hash_UDP_Server;
 Struct_HashLinked_0x4 Hash_UDP_IO;
 int(*UDP_Close_CallBack)(Struct_IOCP_IO*IO) = 0;
-volatile long 次数 = 0;
+volatile long IOCP_Num = 0;
 class Class_IOCP_0x12
 {
 	Class_IOCP_0x12()
@@ -304,9 +302,9 @@ public:
 						DWORD j = 0;
 						for (DWORD i = 0; i < pIpAdapterInfo_P->AddressLength; i++, j += 3)
 						{
-							sprintf(MAC + j, "%02X-", pIpAdapterInfo_P->Address[i] );
+							sprintf(MAC + j, "%02X-", pIpAdapterInfo_P->Address[i]);
 						}
-						MAC[j-1] = 0;
+						MAC[j - 1] = 0;
 						delete pIpAdapterInfo;
 						string Ret = MAC;
 						return Ret;
@@ -448,8 +446,8 @@ public:
 		New_IO->WSABuffer.buf = (CHAR*)malloc(New_IO->WSABuffer.len);
 		memcpy(New_IO->WSABuffer.buf, Data, New_IO->WSABuffer.len);
 		New_IO->IO_State = IO_State_ConnectEx;
-		主机信息结构 = gethostbyname(请求域名);/*获取域名主机信息，返回一个hostent指针*/
-		if (!主机信息结构)
+		IOCP_Hostent = gethostbyname(请求域名);/*获取域名主机信息，返回一个hostent指针*/
+		if (!IOCP_Hostent)
 		{
 			printf("网络错误\n");
 			free(New_IO);
@@ -459,7 +457,7 @@ public:
 		New_IO->Sockaddr_in.sin_port = htons(Port);//设置端口
 		//IOCPHashList.NewestChain->Sockaddr_in.sin_addr.s_addr = inet_addr(请求域名);
 		//客户端Sockaddr_in.sin_addr.S_un.S.addr = htonl("IP地址");//inet_addr()
-		memcpy(&(New_IO->Sockaddr_in.sin_addr), 主机信息结构->h_addr, 4);
+		memcpy(&(New_IO->Sockaddr_in.sin_addr), IOCP_Hostent->h_addr, 4);
 		/*参数2为协议的Socket类型，常用的有3种：SOCK_STREAM、SOCK_DGRAM和SOCK_RAW。SOCK_STREAM对应于TCP，SOCK_DGRAM对应于UDP。*/
 		/*参数3为protocol指定所使用的协议。对于SOCK_STREAM、SOCK_DGRAM两种类型的Socket，该参数为0，对于原始Socket才需要指定具体的协议。*/
 		New_IO->Socket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);/*每次重新send之前需要调用*/
@@ -510,8 +508,8 @@ public:
 		New_IO->WSABuffer.buf = (CHAR*)malloc(New_IO->WSABuffer.len);
 		memcpy(New_IO->WSABuffer.buf, Data, New_IO->WSABuffer.len);
 		New_IO->IO_State = IO_State_ConnectEx;
-		主机信息结构 = gethostbyname(请求域名);/*获取域名主机信息，返回一个hostent指针*/
-		if (!主机信息结构)
+		IOCP_Hostent = gethostbyname(请求域名);/*获取域名主机信息，返回一个hostent指针*/
+		if (!IOCP_Hostent)
 		{
 			printf("网络错误\n");
 			free(New_IO);
@@ -521,7 +519,7 @@ public:
 		New_IO->Sockaddr_in.sin_port = htons(Port);//设置端口
 		//IOCPHashList.NewestChain->Sockaddr_in.sin_addr.s_addr = inet_addr(请求域名);
 		//客户端Sockaddr_in.sin_addr.S_un.S.addr = htonl("IP地址");//inet_addr()
-		memcpy(&(New_IO->Sockaddr_in.sin_addr), 主机信息结构->h_addr, 4);
+		memcpy(&(New_IO->Sockaddr_in.sin_addr), IOCP_Hostent->h_addr, 4);
 		/*参数2为协议的Socket类型，常用的有3种：SOCK_STREAM、SOCK_DGRAM和SOCK_RAW。SOCK_STREAM对应于TCP，SOCK_DGRAM对应于UDP。*/
 		/*参数3为protocol指定所使用的协议。对于SOCK_STREAM、SOCK_DGRAM两种类型的Socket，该参数为0，对于原始Socket才需要指定具体的协议。*/
 		New_IO->Socket = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_OVERLAPPED);/*每次重新send之前需要调用*/
@@ -720,7 +718,7 @@ public:
 		//IOCP_Return->IOCP_IO = CONTAINING_RECORD(IOCP_Return->OVER_LAPPED_P, Struct_IOCP_IO, OVER_LAPPED);/*读取投递函数的IO*/	
 		BOOL Bool = GetQueuedCompletionStatus(IOCP_Handle, (DWORD*)&IOCP_Return->Complete_Size, (PULONG_PTR)&IOCP_Return->IO_Server, &IOCP_Return->OVER_LAPPED_P, INFINITE);
 #ifdef IOCP_Print_Index
-		printf("【完成次数】%d\n", ++Complete_Index);
+		printf("【完成IOCP_Num】%d\n", ++Complete_Index);
 #endif
 		IOCP_Return->IOCP_IO = (Struct_IOCP_IO*)IOCP_Return->OVER_LAPPED_P;/*读取投递函数的IO*/
 		if (IOCP_Return->IOCP_IO->IO_State == IO_State_Read_Keep)
@@ -798,7 +796,7 @@ public:
 				switch (IOCP_Return->Error_Cede)
 				{
 				case WAIT_TIMEOUT:
-					if (!判断Socket状态(IOCP_Return->IOCP_IO->Socket))printf("发送心跳确认对端关闭Socket:%d当前IO:%08X\n", IOCP_Return->IOCP_IO->Socket, IOCP_Return->IOCP_IO);
+					if (!Get_Socket_State(IOCP_Return->IOCP_IO->Socket))printf("发送心跳确认对端关闭Socket:%d当前IO:%08X\n", IOCP_Return->IOCP_IO->Socket, IOCP_Return->IOCP_IO);
 					else printf("连接超时Socket:%d当前IO:%08X\n", IOCP_Return->IOCP_IO->Socket, IOCP_Return->IOCP_IO);
 					break;
 				case ERROR_NETNAME_DELETED:
@@ -876,7 +874,7 @@ public:
 		case IO_State_NewClient:/*ReturnIOCPChain是客户端,ServerChain服务端*/
 		{
 			/*如果接收了第一次客户端的数据,将会影响第一次的WSABUF重叠接收。如果对方是没有延迟的重复发送,将会全部受影响,这时候应该不接收第一次,全部转交给WSARecv处理*/
-			/*如果没有接收第一次数据,那么,这里应该WSARecv预投递好客户端最大一次发送的数据次数*/
+			/*如果没有接收第一IOCP_Num据,那么,这里应该WSARecv预投递好客户端最大一次发送的数据IOCP_Num*/
 			/*取得连入客户端的地址信息取得客户端和本地端的地址信息*/
 			if (IOCP_Return->IO_Server->Protocol != IPPROTO_UDP)
 			{
@@ -1175,8 +1173,8 @@ public:
 							}
 						}
 #ifdef	IOCP_Print_Index
-						InterlockedDecrement(&次数);
-						printf("【SLL数量】%d\n", 次数);
+						InterlockedDecrement(&IOCP_Num);
+						printf("【SLL数量】%d\n", IOCP_Num);
 #endif
 						/*SSL_free和BIO_fre不能同时调用并且BIO释放不干净*/
 						/*
@@ -1572,8 +1570,8 @@ public:
 	static bool TCP_IO_Handshake_SSL(Struct_IOCP_IO*IOCP_IO, Struct_IOCP_IO*IOCP_IO_Sever)
 	{
 #ifdef	IOCP_Print_Index
-		InterlockedIncrement(&次数);
-		printf("【SLL数量】%d\n", 次数);
+		InterlockedIncrement(&IOCP_Num);
+		printf("【SLL数量】%d\n", IOCP_Num);
 #endif
 		/*如果不New一个IO会出现多线程冲突问题或访问冲突问题比如外部释放IOCP_IO*/
 		Struct_IOCP_IO*New_IO = (Struct_IOCP_IO*)malloc(sizeof(Struct_IOCP_IO));
@@ -1660,7 +1658,7 @@ public:
 	{
 		return;
 	}
-	static CHAR 验证socket()
+	static CHAR verification_Socket()
 	{
 		/*
 		LOBYTE取得16进制数最低（最右边）字节的内容
@@ -1689,12 +1687,12 @@ public:
 			return 0;
 		}
 	}
-	static VOID 设置忽略完成端口(SOCKET Socket)
+	static VOID Ignore_IOCP(SOCKET Socket)
 	{
 		/*一般UDP用*/
 		SetFileCompletionNotificationModes((HANDLE)Socket, FILE_SKIP_COMPLETION_PORT_ON_SUCCESS);
 	}
-	static VOID 设置异步Socket(SOCKET Socket)/*已经废弃*/
+	static VOID Asynchronous_Socket(SOCKET Socket)/*已经废弃*/
 	{
 		u_long ulRet = TRUE;
 		ioctlsocket(Socket, FIONBIO, &ulRet);
@@ -2007,7 +2005,7 @@ private:
 
 	}
 #endif
-	static bool 判断Socket状态(SOCKET Socket)
+	static bool Get_Socket_State(SOCKET Socket)
 	{
 		/*
 		判断客户端Socket是否已经断开,否则在一个无效的Socket上投递WSARecv操作会出现异常
