@@ -15,7 +15,6 @@ Emall:dywh@dynix.online
 #pragma once
 #include "stdafx.h"
 #include "HashLinked.h"
-#include "Encode.h"
 #pragma warning(disable: 4996)
 
 
